@@ -1,59 +1,92 @@
-import React, { useState } from 'react';
-import NeuralNetwork3D from './components/NeuralNetwork3D';
+import React, { useState, useEffect, useCallback } from 'react';
+import { NeuralNetworkScene } from './components/scene';
 import ControlsPanel from './components/ControlsPanel';
 import TrainingStats from './components/TrainingStats';
 import ModelSelector from './components/ModelSelector';
 import { useNeuralNetwork } from './hooks/useNeuralNetwork';
-import { useTraining } from './hooks/useTraining';
+import { useTraining, getModelConfig } from './hooks/useTraining';
 import './styles/App.css';
 
 function App() {
   const [selectedModel, setSelectedModel] = useState('XOR');
-  const [networkConfig, setNetworkConfig] = useState({
-    inputSize: 2,
-    hiddenLayers: [3, 3],
-    outputSize: 1,
-    learningRate: 0.1,
-    activation: 'sigmoid'
-  });
+  const [networkConfig, setNetworkConfig] = useState(getModelConfig('XOR'));
+  const [showGrid, setShowGrid] = useState(true);
+  const [showAxes, setShowAxes] = useState(true);
 
-  const { model, createModel, updateModel } = useNeuralNetwork();
-  const { training, startTraining, stopTraining, stats } = useTraining(model, networkConfig);
+  const {
+    model,
+    weights,
+    activations,
+    biases,
+    createModel,
+    updateWeights,
+    calculateActivations,
+    dispose
+  } = useNeuralNetwork();
 
-  const handleConfigChange = (newConfig) => {
-    setNetworkConfig(newConfig);
-    updateModel(newConfig);
-  };
+  const {
+    training,
+    startTraining,
+    stopTraining,
+    resetTraining,
+    stats,
+    pulseIntensity
+  } = useTraining(model, networkConfig, updateWeights, calculateActivations);
 
-  const handleModelChange = (modelType) => {
-    setSelectedModel(modelType);
-    let newConfig = { ...networkConfig };
+  useEffect(() => {
+    const config = getModelConfig(selectedModel);
+    setNetworkConfig(config);
+    createModel(config);
     
-    switch(modelType) {
-      case 'XOR':
-        newConfig = { inputSize: 2, hiddenLayers: [3, 3], outputSize: 1, learningRate: 0.1, activation: 'sigmoid' };
-        break;
-      case 'Linear':
-        newConfig = { inputSize: 1, hiddenLayers: [4, 4], outputSize: 1, learningRate: 0.01, activation: 'relu' };
-        break;
-      case 'Circle':
-        newConfig = { inputSize: 2, hiddenLayers: [6, 6], outputSize: 1, learningRate: 0.1, activation: 'sigmoid' };
-        break;
-      default:
-        break;
+    return () => {
+      dispose();
+    };
+  }, []);
+
+  const handleConfigChange = useCallback((newConfig) => {
+    setNetworkConfig(newConfig);
+  }, []);
+
+  const handleModelChange = useCallback((modelType) => {
+    if (training) {
+      stopTraining();
     }
     
-    setNetworkConfig(newConfig);
-    createModel(newConfig);
-  };
+    setSelectedModel(modelType);
+    const config = getModelConfig(modelType);
+    setNetworkConfig(config);
+    createModel(config);
+    resetTraining();
+  }, [training, stopTraining, createModel, resetTraining]);
+
+  const handleStartTraining = useCallback(() => {
+    startTraining();
+  }, [startTraining]);
+
+  const handleStopTraining = useCallback(() => {
+    stopTraining();
+  }, [stopTraining]);
+
+  const handleResetView = useCallback(() => {
+    const config = getModelConfig(selectedModel);
+    createModel(config);
+    resetTraining();
+  }, [selectedModel, createModel, resetTraining]);
+
+  const totalParams = networkConfig.inputSize * networkConfig.hiddenLayers[0] + 
+    networkConfig.hiddenLayers.reduce((acc, layer, i, arr) => {
+      if (i < arr.length - 1) {
+        return acc + layer * arr[i + 1];
+      }
+      return acc + layer * networkConfig.outputSize;
+    }, 0);
 
   return (
     <div className="app">
       <div className="app-layout">
-        {/* Top Header Bar */}
         <header className="header-bar">
           <div className="header-left">
-            <span className="app-title">Neural Network Studio</span>
+            <span className="app-title">NN Studio</span>
           </div>
           <div className="header-center">
             <div className="training-status">
@@ -66,9 +99,7 @@ function App() {
           </div>
         </header>
 
-        {/* Main Content Area */}
         <div className="main-content">
-          {/* Left Sidebar - Controls */}
           <div className="sidebar left-sidebar">
             <div className="sidebar-section">
               <div className="section-header">
@@ -87,32 +118,51 @@ function App() {
               <ControlsPanel 
                 networkConfig={networkConfig}
                 onConfigChange={handleConfigChange}
-                onStartTraining={startTraining}
-                onStopTraining={stopTraining}
+                onStartTraining={handleStartTraining}
+                onStopTraining={handleStopTraining}
                 isTraining={training}
               />
             </div>
           </div>
 
-          {/* Center Viewport - 3D Visualization */}
           <div className="viewport">
             <div className="viewport-header">
               <span>3D NETWORK VISUALIZATION</span>
               <div className="viewport-controls">
-                <button className="viewport-btn">Reset View</button>
-                <button className="viewport-btn">Toggle Grid</button>
+                <button 
+                  className="viewport-btn" 
+                  onClick={handleResetView}
+                >
+                  Reset View
+                </button>
+                <button 
+                  className={`viewport-btn ${showGrid ? 'active' : ''}`}
+                  onClick={() => setShowGrid(!showGrid)}
+                >
+                  {showGrid ? 'Hide' : 'Show'} Grid
+                </button>
+                <button 
+                  className={`viewport-btn ${showAxes ? 'active' : ''}`}
+                  onClick={() => setShowAxes(!showAxes)}
+                >
+                  {showAxes ? 'Hide' : 'Show'} Axes
+                </button>
               </div>
             </div>
             <div className="visualization-container">
-              <NeuralNetwork3D 
+              <NeuralNetworkScene 
                 networkConfig={networkConfig} 
-                trainingData={stats.trainingData}
-                weights={model?.weights || []}
+                weights={weights}
+                activations={activations}
+                biases={biases}
+                isTraining={training}
+                pulseIntensity={pulseIntensity}
+                showGrid={showGrid}
+                showAxes={showAxes}
               />
             </div>
           </div>
 
-          {/* Right Sidebar - Stats & Info */}
           <div className="sidebar right-sidebar">
             <div className="sidebar-section">
               <div className="section-header">
@@ -140,7 +190,11 @@ function App() {
                 </div>
                 <div className="info-row">
                   <span>Total Parameters:</span>
-                  <span>{(networkConfig.inputSize * networkConfig.hiddenLayers[0] + networkConfig.hiddenLayers.reduce((a, b, i, arr) => a + b * (arr[i + 1] || networkConfig.outputSize), 0)).toLocaleString()}</span>
+                  <span>{totalParams.toLocaleString()}</span>
+                </div>
+                <div className="info-row">
+                  <span>Model Type:</span>
+                  <span>{networkConfig.modelType}</span>
                 </div>
               </div>
             </div>
@@ -152,24 +206,30 @@ function App() {
               <div className="training-controls">
                 <button 
                   className={`train-btn primary ${training ? 'active' : ''}`}
-                  onClick={startTraining}
+                  onClick={handleStartTraining}
                   disabled={training}
                 >
                   {training ? 'TRAINING...' : 'START TRAINING'}
                 </button>
                 <button 
                   className="train-btn secondary"
-                  onClick={stopTraining}
+                  onClick={handleStopTraining}
                   disabled={!training}
                 >
                   STOP TRAINING
+                </button>
+                <button 
+                  className="train-btn secondary"
+                  onClick={handleResetView}
+                  disabled={training}
+                >
+                  RESET NETWORK
                 </button>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Bottom Status Bar */}
         <footer className="status-bar">
           <div className="status-left">
             <span>Epoch: {stats.epoch}</span>
@@ -177,7 +237,7 @@ function App() {
             <span>Accuracy: {(stats.accuracy * 100).toFixed(2)}%</span>
           </div>
           <div className="status-right">
-            <span>Ready</span>
+            <span>{stats.status}</span>
           </div>
         </footer>
       </div>
