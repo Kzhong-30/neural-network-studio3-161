@@ -466,3 +466,40 @@ body {
 .sidebar::-webkit-scrollbar-thumb:hover {
   background: var(--border-light);
 }
+
+/* Neuron Tooltip */
+.neuron-tooltip {
+  background: rgba(20, 20, 30, 0.95);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  min-width: 160px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+}
+
+.neuron-tooltip .tooltip-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+  text-align: center;
+}
+
+.neuron-tooltip .tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  font-size: 11px;
+}
+
+.neuron-tooltip .tooltip-row span:first-child {
+  color: var(--text-muted);
+}
+
+.neuron-tooltip .tooltip-row span:last-child {
+  color: var(--text-primary);
+  font-weight: 500;
+}
