@@ -36,4 +36,5 @@ coverage/
 # Build and cache
 .cache/
 build/
+dist/
 public/build/
